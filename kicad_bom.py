@@ -2,8 +2,8 @@
 
 from collections import namedtuple, defaultdict
 from functools import lru_cache, wraps
-from decimal import Decimal
 from os.path import split, join
+from decimal import Decimal
 import argparse
 import urllib
 import re
@@ -22,7 +22,17 @@ DigiPart = namedtuple("DigiPart", ("digikey_part_number",
 PriceBreak = namedtuple("PriceBreak", ("number", "price_dollars"))
 LOCAL_CACHE_FILE = "/home/caleb/.local/digikey_local_cache.db"
 
-STYLE = """ <style>
+HEAD = """
+<!DOCTYPE html>
+  <head>
+    <title>Kicad BOM</title>
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+"""
+
+CSS = """<style>
 #parts {
     font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
     width: 100%;
@@ -54,10 +64,137 @@ STYLE = """ <style>
     background-color: #EAF2D3;
 }
 
+#parts tr.select td{
+    color: #000000;
+    background-color: #99CCFF;
+}
+
 #parts td.num {
     text-align: right;
 }
 </style>
+"""
+JS = """
+<script>
+function find_price_break(price_breaks, n){
+  price_breaks = price_breaks.split(';');
+  var num_breaks = price_breaks.length
+  for(var i=0; i<num_breaks; i++){
+    var break_high = price_breaks[i].split('@');
+    var break_high_n = Number(break_high[0]);
+    var break_high_price = Number(break_high[1]);
+    if(i == 0){
+      if(n < break_high_n){
+        return Number("NaN");
+      }
+      else{
+        continue;
+      }
+    }
+    var break_low = price_breaks[i-1].split('@');
+    var break_low_n = Number(break_low[0]);
+    var break_low_price = Number(break_low[1]);
+    if(break_low_n<=n && n < break_high_n){
+      return break_low_price;
+    }
+  }
+  var break_highest = price_breaks[num_breaks-1].split('@');
+  var break_highest_price = Number(break_high[1]);
+  return break_highest_price
+}
+
+function update_tottot(){
+  var prices = $('.price').text().split('$');
+  var sum = 0.0;
+  for(var i=0; i<prices.length;i++){
+    sum += Number(prices[i]);
+  }
+  $('#pricetot').text('$'+sum.toFixed(6))
+}
+
+$('input').on('focus', function(){
+  $(this).parent().parent().addClass('select');
+});
+
+$('input').on('blur', function(){
+  $(this).parent().parent().removeClass('select');
+});
+
+$('input').on('keypress', function(event) {
+  if(event.type == 'keypress'){
+    var key = event.charCode || event.keyCode;
+    if(key == 13){ // ie. Return
+      return;
+    }
+  }
+  $(this).css('background-color', '#FFCCFF');
+  });
+
+$('input').on('change keypress', function(event) {
+  if(event.type == 'keypress'){
+    var key = event.charCode || event.keyCode;
+    if(key != 13){ // ie. Not Return
+      return;
+    }
+  }
+  $(this).css('background-color', '#FFFFFF');
+  var n = Number($(this).val());
+  if(Number.isNaN(n)){
+    return;
+  }
+  var id_base = $(this).attr('id').split('_')[0];
+  var priceper_field = $('#'+id_base+'_priceper')
+  var price_field = $('#'+id_base+'_price')
+  var priceper = find_price_break(priceper_field.attr('title'),n);
+  var price = priceper*n;
+  priceper_field.text('$'+priceper.toFixed(6));
+  price_field.text('$'+price.toFixed(6));
+  update_tottot();
+});
+
+var cleanUp = function(a) {
+  a.textContent = 'Downloaded';
+  a.dataset.disabled = true;
+
+  // Need a small delay for the revokeObjectURL to work properly.
+  setTimeout(function() {
+    window.URL.revokeObjectURL(a.href);
+  }, 1500);
+};
+
+function downloadFile(){
+  console.log("preparing file for download");
+  window.URL = window.webkitURL || window.URL;
+
+  var prevLink = $('#outlink');
+  var output = $('#output');
+  if (prevLink) {
+    window.URL.revokeObjectURL(prevLink.href);
+    output.innerHTML = '';
+  }
+
+  var bb = new Blob(["Hello World! This is some text"], {type: "text/plain"});
+
+  var a = $('<a id=\'#outlink\'>Download ready</a>');
+  a.download = $('#filename').value;
+  a.attr('href',window.URL.createObjectURL(bb):;
+
+  //a.dataset.downloadurl = ["text/plain", a.download, a.href].join(':');
+  a.draggable = true; // Don't really need, but good practice.
+  a.addClass('dragout');
+
+  output.prepend(a);
+
+  a.onclick = function(e) {
+    if ('disabled' in this.dataset) {
+      return false;
+    }
+
+    cleanUp(this);
+  };
+}
+
+</script>
 """
 class disk_cache:
     def __init__(self, cache_file):
@@ -118,11 +255,13 @@ def scrape_part(digikey_part_number):
 
 def find_unit_price(price_breaks, number):
     price_breaks = sorted(price_breaks, key=lambda x: x.number)
-    for i, price_break in enumerate(price_breaks):
-        if i == 0 and number < price_break.number:
-            return Decimal("nan")  # Cannot order so few
-        if number >= price_break.number:
-            return price_break.price_dollars
+    for i, break_high in enumerate(price_breaks):
+        if i == 0 and number < break_high.number:
+            return Decimal("NaN")
+        break_low = price_breaks[i-1]
+        if break_low.number<=number < break_high.number:
+            return break_low.price_dollars
+    return price_breaks[-1].price_dollars
 
 
 def get_board_name():
@@ -142,54 +281,82 @@ def get_parts(xml_in):
             if digipart:
                 digipart = scrape_part(digipart.getText())
                 parts[digipart].append(comp.attrs["ref"])
-            else:
-                print("No digipart for part {}".format(comp.attrs["ref"]))
-        else:
-            print("No fields for part {}".format(comp.attrs["ref"]))
-    # for part, comps in parts.items():
-    #     print("{}   :   {}".format(part.digikey_part_number, comps))
+                continue
+        print("No digipart for part {}".format(comp.attrs["ref"]))
     return parts
 
 
-def gen_markdown_output(title, parts):
-    html = [STYLE]
-    html.append("<h1>{} - Bill of Materials</h1>".format(title))
+def gen_html_output(title, parts):
+    html = [HEAD, CSS]
 
-    html.append("\n")
-    html.append("<table id=\"parts\">")
-    html.append("<thead>\n<tr>")
-    html.append("<td>Description</td>")
-    html.append("<td>Vendor Part #</td>")
-    html.append("<td>Manufacturer</td>")
-    html.append("<td>Manufacturer Part #</td>")
-    html.append("<td>Board Reference</td>")
-    html.append("<td class=\"num\">Total Used</td>")
-    html.append("<td class=\"num\">Unit Price</td>")
-    html.append("<td class=\"num\">Total Price</td>")
-    html.append("</tr>\n</thead>\n<tbody>")
+    html.append("<body>")
+    html.append("<h1>{} - Bill of Materials</h1>\n".format(title))
+    html.append("<input type=\"text\" id=\"filename\" value=\"MyFile.txt\" placeholder=\"filename.txt\">")
+    html.append("<button onclick=\"downloadFile()\">Create File</button> <span id=\"output\"></span>")
+
+    html.append("\n".join(["<table id=\"parts\">",
+                           "  <thead>",
+                           "  <tr>",
+                           "    <td>#</td>",
+                           "    <td>Description</td>",
+                           "    <td>Vendor Part #</td>",
+                           "    <td>Manufacturer</td>",
+                           "    <td>Manufacturer Part #</td>",
+                           "    <td>Board Reference</td>",
+                           "    <td class=\"num\">Total Used</td>",
+                           "    <td class=\"num\">Total Order</td>",
+                           "    <td class=\"num\">Unit Price</td>",
+                           "    <td class=\"num\">Total Price</td>",
+                           "  </tr>",
+                           "  </thead>",
+                           "<tbody>"]))
     parts = sorted(parts.items(), key=lambda x: x[1][0])
     total_price = Decimal(0)
     for i, (part, refs) in enumerate(parts):
+        cls = ""
         if i % 2:
-            html.append("<tr>")
-        else:
-            html.append("<tr class=\"alt\">")
+            cls = "class=\"alt\""
+        html.append("<tr {cls}>".format(cls=cls))
+        # Left Numbering
+        html.append("<td>{}</td>".format(i+1))
+        # Part Description
         html.append("<td>{}</td>".format(part.description))
-        html.append("<td><a href=\"{}\">{}</a></td>".format(part.url, part.digikey_part_number))
+        # Vendor Part Number
+        html.append("<td><a href=\"{}\">{}</a></td>".format(part.url,
+                                                            part.digikey_part_number))
+        # Manufacturer
         html.append("<td>{}</td>".format(part.manufacturer))
+        # Manufacturer Part Number
         html.append("<td>{}</td>".format(part.manufacturer_part_number))
+        # Board References
         refs.sort()
         html.append("<td>{}</td>".format(', '.join(refs)))
+        # Number Used
         number_used = len(refs)
         html.append("<td class=\"num\">{}</td>".format(number_used))
+        # Number Order
+        input_ = ("<input type=\"number\" " +
+                  "id=\"{id}_input\" " +
+                  "value=\"{value}\">").format(id=i, value=number_used)
+        html.append("<td class=\"num\">{}</td>".format(input_))
+        # Price Breaks w/ current break
         unit_price = find_unit_price(part.price_breaks, number_used)
-        html.append("<td class=\"num\">${:F}</td>".format(unit_price))
+        price_breaks_txt = ';'.join("{}@{}".format(b.number, b.price_dollars)
+                                    for b in part.price_breaks)
+
+        html.append(("<td id=\"{}_priceper\" class=\"num\" title=\"{}\">" +
+                    "${:F}</td>").format(i, price_breaks_txt, unit_price))
         gross_price = unit_price*number_used
         total_price += gross_price
-        html.append("<td class=\"num\">${:02F}</td>".format(gross_price))
+        html.append(("<td id=\"{}_price\" " +
+                    "class=\"num price\">${:02F}</td>").format(i,gross_price))
         html.append("</tr>")
-    html.append("<tr>"+"<td></td>"*6+"<td>Sum</td><td class=\"num\">${:F}</td></tr>".format(total_price))
+    html.append("<tr>"+"<td></td>"*7 +
+                ("<td>Sum</td><td id=\"pricetot\" class=\"num\">" +
+                 "${:F}</td></tr>").format(total_price))
     html.append("</tbody>\n</table>")
+    html.append("</body>")
+    html.append(JS)
 
     html = "\n".join(html)
     with open("{}.html".format(ARGS.output), 'w') as f:
@@ -199,9 +366,9 @@ def gen_markdown_output(title, parts):
 def main():
     parts = get_parts(ARGS.xml_in)
     title = re.findall("(.*)\.xml$", split(ARGS.xml_in)[1])[0]
-    extra_bom = join(split(ARGS.xml_in)[0],"{}_BOMExtra.xml".format(title))
+    extra_bom = join(split(ARGS.xml_in)[0], "{}_BOMExtra.xml".format(title))
     parts.update(get_parts(extra_bom))
-    gen_markdown_output(title, parts)
+    gen_html_output(title, parts)
 
 
 if __name__ == "__main__":
