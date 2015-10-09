@@ -112,6 +112,68 @@ function update_tottot(){
   $('#pricetot').text('$'+sum.toFixed(6))
 }
 
+function cleanUp(a) {
+  a.textContent = 'Downloaded';
+//  a.dataset.disabled = true;
+  $(a).attr('data-disabled', true);
+
+  // Need a small delay for the revokeObjectURL to work properly.
+  setTimeout(function() {
+    window.URL.revokeObjectURL(a.href);
+    $(a).remove()
+  }, 1500);
+};
+
+function generateFile(){
+  console.log("generating file");
+  var objs = [];
+  $('tr.datarow').each( function(){
+    var data = $(this).children();
+    var obj = {
+      part_number: $(data[2]).text(),
+      description: $(data[1]).text(),
+      unit_price: $(data[8]).text(),
+      total_price: $(data[9]).text(),
+      num_order: $(data[7]).children()[0].value,
+    };
+    objs.push(obj);
+  });
+//    console.log(JSON.stringify(objs));
+    return JSON.stringify(objs);
+}
+
+function downloadFile(){
+  console.log("preparing file for download");
+  window.URL = window.webkitURL || window.URL;
+
+  var prevLink = $('#outlink');
+  var output = $('#output');
+  if (prevLink) {
+    window.URL.revokeObjectURL(prevLink.href);
+    output.innerHTML = '';
+  }
+
+  var bb = new Blob([generateFile()], {type: "application/json"});
+
+  var a = $('<a id=\\\'outlink\\\'>Download ready</a>');
+  a.attr('download',$('#filename').attr('value'));
+  a.attr('href',window.URL.createObjectURL(bb));
+
+  a.attr('data-downloadurl', ["application/json", a.download, a.href].join(':'));
+  a.draggable = true; // Don't really need, but good practice.
+  a.addClass('dragout');
+
+  output.prepend(a);
+
+  a.on('click', function(e) {
+    if ('disabled' in this.dataset) {
+      return false;
+    }
+
+    cleanUp(this);
+  });
+}
+
 $('input').on('focus', function(){
   $(this).parent().parent().addClass('select');
 });
@@ -151,49 +213,6 @@ $('input').on('change keypress', function(event) {
   price_field.text('$'+price.toFixed(6));
   update_tottot();
 });
-
-var cleanUp = function(a) {
-  a.textContent = 'Downloaded';
-  a.dataset.disabled = true;
-
-  // Need a small delay for the revokeObjectURL to work properly.
-  setTimeout(function() {
-    window.URL.revokeObjectURL(a.href);
-  }, 1500);
-};
-
-function downloadFile(){
-  console.log("preparing file for download");
-  window.URL = window.webkitURL || window.URL;
-
-  var prevLink = $('#outlink');
-  var output = $('#output');
-  if (prevLink) {
-    window.URL.revokeObjectURL(prevLink.href);
-    output.innerHTML = '';
-  }
-
-  var bb = new Blob(["Hello World! This is some text"], {type: "text/plain"});
-
-  var a = $('<a id=\'#outlink\'>Download ready</a>');
-  a.download = $('#filename').value;
-  a.attr('href',window.URL.createObjectURL(bb):;
-
-  //a.dataset.downloadurl = ["text/plain", a.download, a.href].join(':');
-  a.draggable = true; // Don't really need, but good practice.
-  a.addClass('dragout');
-
-  output.prepend(a);
-
-  a.onclick = function(e) {
-    if ('disabled' in this.dataset) {
-      return false;
-    }
-
-    cleanUp(this);
-  };
-}
-
 </script>
 """
 class disk_cache:
@@ -291,7 +310,7 @@ def gen_html_output(title, parts):
 
     html.append("<body>")
     html.append("<h1>{} - Bill of Materials</h1>\n".format(title))
-    html.append("<input type=\"text\" id=\"filename\" value=\"MyFile.txt\" placeholder=\"filename.txt\">")
+    html.append("<input type=\"text\" id=\"filename\" value=\"MyFile.json\" placeholder=\"filename.json\">")
     html.append("<button onclick=\"downloadFile()\">Create File</button> <span id=\"output\"></span>")
 
     html.append("\n".join(["<table id=\"parts\">",
@@ -313,10 +332,10 @@ def gen_html_output(title, parts):
     parts = sorted(parts.items(), key=lambda x: x[1][0])
     total_price = Decimal(0)
     for i, (part, refs) in enumerate(parts):
-        cls = ""
         if i % 2:
-            cls = "class=\"alt\""
-        html.append("<tr {cls}>".format(cls=cls))
+            html.append("<tr class=\"datarow alt\">")
+        else:
+            html.append("<tr class=\"datarow\">")
         # Left Numbering
         html.append("<td>{}</td>".format(i+1))
         # Part Description
@@ -351,7 +370,7 @@ def gen_html_output(title, parts):
         html.append(("<td id=\"{}_price\" " +
                     "class=\"num price\">${:02F}</td>").format(i,gross_price))
         html.append("</tr>")
-    html.append("<tr>"+"<td></td>"*7 +
+    html.append("<tr>"+"<td></td>"*8 +
                 ("<td>Sum</td><td id=\"pricetot\" class=\"num\">" +
                  "${:F}</td></tr>").format(total_price))
     html.append("</tbody>\n</table>")
