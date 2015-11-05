@@ -34,8 +34,10 @@ HEAD = """
   </head>
 """
 
-CSS = open(join(sys.path[0], "kicad_bom.css"), "r").read()
-JS = open(join(sys.path[0], "kicad_bom.js"), "r").read()
+with open(join(sys.path[0], "kicad_bom.css"), "r") as f:
+    CSS = f.read()
+with open(join(sys.path[0], "kicad_bom.js"), "r") as f:
+    JS = f.read()
 
 
 class disk_cache:
@@ -64,15 +66,13 @@ class disk_cache:
 
     def _query_page(self, url):
         self.curs.execute("""
-        SELECT query_date,page_text FROM pages 
+        SELECT query_date,page_text FROM pages
             WHERE url=?;""", (url,))
         return self.curs.fetchone()
 
     def _is_too_old(self, old_time):
         from time import time
         now = time()
-        print(old_time)
-        print(type(old_time))
         return (now-old_time) > CUTOFF_TIME
 
     def __call__(self, f):
@@ -170,22 +170,24 @@ def gen_html_output(title, parts):
     html.append("<input type=\"text\" id=\"filename\" value=\"MyFile.json\" placeholder=\"filename.json\">")
     html.append("<button onclick=\"downloadFile()\">Create File</button> <span id=\"output\"></span>")
 
-    html.append("\n".join(["<table id=\"parts\">",
-                           "  <thead>",
-                           "  <tr>",
-                           "    <td>#</td>",
-                           "    <td>Description</td>",
-                           "    <td>Vendor Part #</td>",
-                           "    <td>Manufacturer</td>",
-                           "    <td>Manufacturer Part #</td>",
-                           "    <td>Board Reference</td>",
-                           "    <td class=\"num\">Total Used</td>",
-                           "    <td class=\"num\">Total Order</td>",
-                           "    <td class=\"num\">Unit Price</td>",
-                           "    <td class=\"num\">Total Price</td>",
-                           "  </tr>",
-                           "  </thead>",
-                           "<tbody>"]))
+    header = ["<table id=\"parts\">",
+              "  <thead>",
+              "  <tr>",
+              "    <td>#</td>",
+              "    <td>Description</td>",
+              "    <td>Vendor Part #</td>",
+              "    <td>Manufacturer</td>",
+              "    <td>Manufacturer Part #</td>",
+              "    <td>Board Reference</td>",
+              "    <td class=\"num\">Total Used</td>",
+              "  </tr>",
+              "  </thead>",
+              "<tbody>"]
+    if(not ARGS.noprice):
+        header.insert(10, "    <td class=\"num\">Total Order</td>")
+        header.insert(11, "    <td class=\"num\">Unit Price</td>")
+        header.insert(12, "    <td class=\"num\">Total Price</td>")
+    html.extend(header)
     parts = sorted(parts.items(), key=lambda x: x[1][0])
     total_price = Decimal(0)
     for i, (part, refs) in enumerate(parts):
@@ -205,31 +207,33 @@ def gen_html_output(title, parts):
         # Manufacturer Part Number
         html.append("<td>{}</td>".format(part.manufacturer_part_number))
         # Board References
-        refs.sort()
+        refs.sort(key=lambda x: int(re.search("[0-9]+$",x).group()))
         html.append("<td>{}</td>".format(', '.join(refs)))
         # Number Used
         number_used = len(refs)
         html.append("<td class=\"num\">{}</td>".format(number_used))
-        # Number Order
-        input_ = ("<input type=\"number\" " +
-                  "id=\"{id}_input\" " +
-                  "value=\"{value}\">").format(id=i, value=number_used)
-        html.append("<td class=\"num\">{}</td>".format(input_))
-        # Price Breaks w/ current break
-        unit_price = find_unit_price(part.price_breaks, number_used)
-        price_breaks_txt = ';'.join("{}@{}".format(b.number, b.price_dollars)
-                                    for b in part.price_breaks)
+        if(not ARGS.noprice):
+            # Number Order
+            input_ = ("<input type=\"number\" " +
+                      "id=\"{id}_input\" " +
+                      "value=\"{value}\">").format(id=i, value=number_used)
+            html.append("<td class=\"num\">{}</td>".format(input_))
+            # Price Breaks w/ current break
+            unit_price = find_unit_price(part.price_breaks, number_used)
+            price_breaks_txt = ';'.join("{}@{}".format(b.number, b.price_dollars)
+                                        for b in part.price_breaks)
 
-        html.append(("<td id=\"{}_priceper\" class=\"num\" title=\"{}\">" +
-                    "${:F}</td>").format(i, price_breaks_txt, unit_price))
-        gross_price = unit_price*number_used
-        total_price += gross_price
-        html.append(("<td id=\"{}_price\" " +
-                    "class=\"num price\">${:02F}</td>").format(i,gross_price))
+            html.append(("<td id=\"{}_priceper\" class=\"num\" title=\"{}\">" +
+                        "${:F}</td>").format(i, price_breaks_txt, unit_price))
+            gross_price = unit_price*number_used
+            total_price += gross_price
+            html.append(("<td id=\"{}_price\" " +
+                        "class=\"num price\">${:02F}</td>").format(i, gross_price))
         html.append("</tr>")
-    html.append("<tr>"+"<td></td>"*8 +
-                ("<td>Sum</td><td id=\"pricetot\" class=\"num\">" +
-                 "${:F}</td></tr>").format(total_price))
+    if(not ARGS.noprice):
+        html.append("<tr>"+"<td></td>"*8 +
+                    ("<td>Sum</td><td id=\"pricetot\" class=\"num\">" +
+                     "${:F}</td></tr>").format(total_price))
     html.append("</tbody>\n</table>")
     html.append("</body>")
     html.append(JS)
@@ -249,7 +253,10 @@ def main():
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser()
-    PARSER.add_argument("xml_in")
-    PARSER.add_argument("output")
+    arg = PARSER.add_argument
+    arg("xml_in")
+    arg("output")
+    arg("--no-price", dest="noprice", action="store_true",
+        help="include to disable price output, useful for assembly references")
     ARGS = PARSER.parse_args()
     main()
