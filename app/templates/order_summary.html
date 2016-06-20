@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Summary of Order #{{ order.id }}</h2>
+<div class="row">
+<div class="well col-sm-5">
+  <b>Name: </b> {{ order.order_name }} </br>
+  <b>Description: </b> {{ order.description }} </br>
+  <b>Requested Delivery Date: </b> {{ order.delivery_date }} </br>
+  <b>Requestor Name: </b> {{ order.requestor_name }} </br>
+  <b>Requestor Phone: </b> {{ order.requestor_phone }} </br>
+  <b>Supervisor Name: </b> {{ order.supervisor_name }} </br>
+  <b>Cost Object: </b> {{ order.cost_object }} </br>
+</div>
+</div>
+<h3>Bill of Materials included:</h3>
+<div class="row">
+  <div class="col-sm-4">
+    <table class="table">
+      <thead>
+        <th> ID </th>
+        <th> Name </th>
+        <th> Count </th>
+      </thead>
+      <tbody>
+    {% for order_bom in order.boms %}
+    <tr>
+      <td>{{ order_bom.bom.id }}</td>
+      <td>{{ order_bom.bom.name }}</td>
+      <td>{{ order_bom.bom_count }}</td>
+    </tr>
+    {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<h3>Parts in Order</h3>
+    <hr>
+    <form action="" method="POST" name="{{ form.name }}">
+    {{ form.hidden_tag() }}
+    {{ form.submit }}
+    {{ form.export }}
+    {{ parts_table }}
+    </form>
+{% endblock %}

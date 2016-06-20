@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+  <input type='tel'></input>
+  <div class='row'>
+    <div class='col-sm-6'>
+      <h1>Existing Bills of Materials</h1>
+      {{ bom_table }}
+    </div>
+    <div class='col-sm-6'>
+      <h1>Existing Orders</h1>
+      {{ order_table }}
+    </div>
+  </div>
+{% endblock %}

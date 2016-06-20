@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<a href= {{ url_for('bom_summary', id=bom.id-1) }}>Prev</a>|
+<a href= {{ url_for('bom_summary', id=bom.id+1) }}>Next</a>
+<h1> "{{ bom.name }}" Summary </h1>
+  <pre class='lead'>
+    <b>id:</b> {{ bom.id }}
+    <b>version:</b> {{ bom.version }}
+    <b>author:</b> {{ bom.author }}
+    <b>Uploaded On:</b> {{bom.timestamp }}
+  </pre>
+  <form action="" method="post" name="lookup_parts" enctype="multipart/form-data">
+    <input type="submit" value="Lookup Parts">
+  </form>
+  <hr>
+  <a href= {{ url_for('bom_summary', id=bom.id, display='full') }}> Full Display </a>
+  <a href= {{ url_for('bom_summary', id=bom.id, display='condensed') }}> Condensed Display </a>
+  {{ parts_table }}
+  <hr>
+{% endblock %}

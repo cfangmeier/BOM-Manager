@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class='row'>
+  <div class='col-sm-4'>
+    <form method="POST" action="" name="search_part" enctype="multipart/form-data" >
+        {{ form.csrf_token }}
+          <table class="table">
+            <tr>
+              <td>{{ form.manufacturer.label }}</td>
+              <td>{{ form.manufacturer_part_number.label }}</td>
+            </tr>
+            <tr>
+              <td>{{ form.manufacturer(size=5) }}</td>
+              <td>{{ form.manufacturer_part_number(size=20) }}</td>
+            </tr>
+          </table>
+        </div>
+        {{ form.submit }}
+    </form>
+  </div>
+  <hr>
+  {% for part in parts %}
+  <div class='row'>
+    <div class="container">
+      <div class="jumbotron">
+        <h3>{{ part.short_description }}</h3> </br>
+        <b>Manufacturer: </b>{{ part.manufacturer }} </br>
+        <b>Manufacturer Part #: </b>{{ part.manufacturer_part_number }} </br>
+        <hr>
+        {% for vendorpart in part.vendorparts %}
+        <div class="container">
+          <div class="row">
+            <div class="col-sm-6">
+              <h3> Vendor Part Info </h3>
+              <b>Vendor: </b> {{ vendorpart.vendor }} </br>
+              <b>Vendor Part #: </b> {{ vendorpart.vendor_part_number }} </br>
+            </div>
+            <div class="col-sm-6">
+              <h3> Price Breaks</h3>
+              <table class='table table-striped table-condensed'>
+                <thead>
+                  <th> Count </th>
+                  <th> Unit Price </th>
+                </thead>
+                <tbody>
+                {% for break in vendorpart.price_breaks %}
+                <tr>
+                  <td class="text-right">{{ break['BreakQuantity'] }}</td>
+                  <td class="text-right">{{ break['UnitPrice'] }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+{% endblock %}

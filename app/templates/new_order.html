@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+  <div><h3>Select BOM's to include in new order.</h1><div>
+  <form action="" method="post" name="new_order" enctype="multipart/form-data" role="form">
+    {{ form.hidden_tag() }}
+    {{ bom_table }}
+    <hr>
+    <div class="row">
+      <div class="col-sm-3 form-group">
+        {{ form.order_name.label }}
+        {{ form.order_name(class_='form-control') }}
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-3 form-group">
+        {{ form.requestor_name.label }}
+        {{ form.requestor_name(class_='form-control') }}
+      </div>
+      <div class="col-sm-3 form-group">
+        {{ form.requestor_phone.label }}
+        {{ form.requestor_phone(class_='form-control') }}
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-3 form-group">
+        {{ form.supervisor_name.label }}
+        {{ form.supervisor_name(class_='form-control') }}
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-3 form-group">
+        {{ form.delivery_date.label }}
+        <div class="input-group date">
+          {{ form.delivery_date(class_='form-control') }}
+          <span class="input-group-addon">
+            <i class="glyphicon glyphicon-th"></i>
+          </span>
+        </div>
+      </div>
+      <div class="col-sm-3 form-group">
+        {{ form.cost_object.label }}
+        {{ form.cost_object(class_='form-control') }}
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-6 form-group">
+        {{ form.description.label }}
+        {{ form.description(class_='form-control') }}
+      </div>
+    </div>
+    <div class="form-group">
+      {{ form.submit }}
+    </div>
+    {% for error in form.errors %}
+      <span style="color: red;">[{{ error }}]</span>
+    {% endfor %}<br>
+  </form>
+
+  <script>
+  $('.input-group.date').datepicker({
+  });
+  </script>
+{% endblock %}

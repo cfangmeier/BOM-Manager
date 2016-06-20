@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+  <form action="" method="post" name="upload" enctype="multipart/form-data">
+    <div class="col-xs-12" style="height:30px;"></div>
+    <div class='row'>
+      <div class='col-sm-3'>
+         <table class='table'>
+           <tr>
+             <td> {{ form.version.label }} </td>
+             <td>{{ form.version }}</td>
+           </tr>
+           <tr>
+             <td>{{ form.author.label }}</td>
+             <td>{{ form.author }}</td>
+           </tr>
+         </table>
+      </div>
+      <div class='col-sm-3'>
+        {{ form.hidden_tag() }}
+        {{ form.file }}<br>
+        <input type="submit" value="Upload File">
+      </div>
+    </div>
+  </form>
+{% endblock %}
