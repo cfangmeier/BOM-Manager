@@ -41,9 +41,9 @@ class Digikey():
         """
         resp = self.oauth.authorized_response()
         if resp is None:
-            flash('Request for authorization denied. :(')
+            flash('Request for authorization denied. :(', category='warning')
         else:
-            flash('You logged in successfully.')
+            flash('You logged in successfully.', category='success')
             now = datetime.now()
             lifetime = timedelta(seconds=int(resp['expires_in']))
             session['Digikey_token'] = resp['access_token']
@@ -125,10 +125,12 @@ class Digikey():
                                    data=data,
                                    headers=headers)
         except json.decoder.JSONDecodeError:
-            flash('Error Looking up part {}!'.format(bompart.lookup_id))
+            flash('Error Looking up part {}!'.format(bompart.lookup_id),
+                  category='warning')
             return None
         if resp.status != 200:
-            flash('Error Looking up part {}!'.format(bompart.lookup_id))
+            flash('Error Looking up part {}!'.format(bompart.lookup_id),
+                  category='warning')
             return None
         part_raw = resp.data['Parts'][0]
         part_raw['vendor'] = 'Digikey'

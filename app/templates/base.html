@@ -10,7 +10,6 @@
     <script src="/static/js/jquery-2.2.4.min.js"></script>
     <script src="/static/js/bootstrap.min.js"></script>
     <script src="/static/js/bootstrap-datepicker.min.js"></script>
-    <!-- <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> -->
   </head>
   <body>
     <div class="container-fluid">
@@ -25,18 +24,21 @@
           </ul>
         </div>
         <div class="col-sm-10">
-          {% with messages = get_flashed_messages() %}
+          {% with messages = get_flashed_messages(with_categories=True) %}
             {% if messages %}
             <div class='row'>
             <div class='col-sm-8'>
-              <!-- <ul> -->
-              {% for message in messages %}
-                  <!-- <li class="bg-danger">{{ message }} </li> -->
-              <div class="alert alert-warning">
-                <strong>Warning!</strong> {{ message }}
+              {% for category, text in messages %}
+              {% if category in ['success', 'info', 'warning', 'danger'] %}
+              <div class="alert alert-{{ category }}">
+                <strong>{{ category.title() }}:</strong> {{ text }}
               </div>
+              {% else %}
+              <div class="alert alert-info">
+                <strong>Info:</strong> {{ text }}
+              </div>
+              {% endif %}
               {% endfor %}
-              <!-- </ul> -->
             </div>
             </div>
             {% endif %}
@@ -47,4 +49,27 @@
       </div>
     </div>
   </body>
+  <script>
+  $(document).ready(function () {
+    $('.price_break').each(function(index){
+      var outstr = '<table class="table table-condensed">';
+      var outstr = outstr.concat('<thead><th>count</th><th>Price</th></thead><tbody>');
+      var breaks = this.getAttribute('data-price-breaks').split('~');
+      for(var i=0; i<breaks.length; i++){
+        outstr = outstr.concat('<tr>');
+        var splited = breaks[i].split(':');
+        outstr = outstr.concat('<td class="text-right">',splited[0],'</td>')
+        outstr = outstr.concat('<td class="text-right">',splited[1],'</td>')
+        outstr = outstr.concat('</tr>');
+      }
+      outstr = outstr.concat('</tbody></table>');
+      this.setAttribute('title', outstr);
+      this.setAttribute('data-price-breaks', null);
+    });
+    $('[data-toggle="tooltip"]').tooltip({
+      container : 'body',
+      html: true
+    });
+  });
+  </script>
 </html>

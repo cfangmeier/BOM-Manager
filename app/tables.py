@@ -147,7 +147,7 @@ class BOMPartTableShort(Table):
     manufacturer = Col('Manufacturer')
     manufacturer_part_number = Col('Manufacturer Part #')
     short_description = Col('Short Description')
-    count = Col('Count')
+    count = Col('Count', td_kwargs={'class': 'text-right'})
     references = Col('Refs')
 
     def __init__(self, items, **kwargs):
@@ -216,10 +216,13 @@ class OrderPartTable(Table):
     vendor_part_number = Col('Vendor Part #')
     manufacturer = Col('Manufacturer')
     manufacturer_part_number = Col('Manufacturer Part #')
-    used_count = Col('Used Count', td_classes=['text-right'])
+    used_count = Col('Used Count', td_kwargs={'class': 'text-right'})
     order_count = Col('Order Count')
-    unit_price = Col('Unit Price', td_classes=['text-right'])
-    total_price = Col('Total Price', td_classes=['text-right'])
+    unit_price = Col('Unit Price', td_kwargs={'class': 'text-right price_break',
+                                              'data-toggle': 'tooltip',
+                                              'data-placement': 'auto',
+                                              'data-price-breaks': lambda x: x['part'].vendorpart.format_price_breaks()})
+    total_price = Col('Total Price', td_kwargs={'class': 'text-right'})
 
     class F(Form):
         submit = SubmitField("Update Parts Count")
@@ -261,7 +264,7 @@ class OrderPartTable(Table):
                 unit_price = item.vendorpart.get_pricebreak(order_count.data)
                 total_price = order_count.data*unit_price
             except ValueError as e:
-                flash(str(e))
+                flash(str(e), category='warning')
                 unit_price = 0
                 total_price = 0
 
@@ -276,7 +279,7 @@ class OrderPartTable(Table):
                          'order_count': order_count,
                          'unit_price': unit_price,
                          'total_price': total_price,
-                         }
+                         'part': item}
             item_dicts.append(item_dict)
         super().__init__(item_dicts)
 

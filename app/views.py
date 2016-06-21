@@ -89,7 +89,7 @@ def upload():
         bom.author = form.author.data
         db.session.add(bom)
         db.session.commit()
-        flash("File {} successfully processed.".format(filename))
+        flash("File {} successfully processed.".format(filename), category='success')
         return redirect(url_for('bom_summary', id=bom.id))
     return render_template('upload.html', form=form)
 
@@ -104,7 +104,7 @@ def new_order():
                     for id_, s_name, c_name in table.inputs
                     if getattr(form, s_name).data is True]
         if not bom_data:
-            flash('Must select at least 1 BOM to include in order')
+            flash('Must select at least 1 BOM to include in order', category='warning')
             return render_template('new_order.html',
                                    bom_table=table,
                                    form=form)

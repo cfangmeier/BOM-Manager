@@ -130,6 +130,10 @@ class VendorPart(db.Model):
         fmt = 'No price-cut found for quantity {} of vendor part {}.'
         raise ValueError(fmt.format(n, self.vendor_part_number))
 
+    def format_price_breaks(self):
+        return '~'.join('{}:{:04f}'.format(x['BreakQuantity'], x['UnitPrice'])
+                        for x in self.price_breaks)
+
 
 class Order(db.Model):
     __tablename__ = 'order'
