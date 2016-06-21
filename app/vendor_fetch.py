@@ -124,12 +124,14 @@ class Digikey():
                                    format='json',
                                    data=data,
                                    headers=headers)
-        except json.decoder.JSONDecodeError:
-            flash('Error Looking up part {}!'.format(bompart.lookup_id),
+        except json.decoder.JSONDecodeError as e:
+            flash(('Error Looking up part {}! '
+                   'JSONDecodeError {}').format(bompart.lookup_id, e),
                   category='warning')
             return None
         if resp.status != 200:
-            flash('Error Looking up part {}!'.format(bompart.lookup_id),
+            flash(('Error Looking up part {}! '
+                   'API returned {}').format(bompart.lookup_id, resp.status),
                   category='warning')
             return None
         part_raw = resp.data['Parts'][0]

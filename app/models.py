@@ -52,7 +52,7 @@ class BillOfMaterials(db.Model):
                     try:
                         lookup_source = vendors[field.attrib['name']]
                         lookup_id = field.text
-                        return lookup_source, lookup_id
+                        return lookup_source.strip(), lookup_id.strip()
                     except KeyError:
                         continue
             except AttributeError:
