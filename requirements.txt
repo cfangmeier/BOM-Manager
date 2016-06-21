@@ -8,7 +8,7 @@ Flask-OAuthlib==0.9.3
 Flask-SQLAlchemy==2.1
 Flask-SSLify==0.1.5
 -e git+ssh://git@github.com/cfangmeier/flask_table.git#egg=Flask-Table
-Flask-Uploads==0.2.0
+-e git+ssh://git@github.com/maxcountryman/flask-uploads.git#egg=Flask-Uploads
 Flask-WTF==0.12
 ipython-genutils==0.1.0
 itsdangerous==0.24
