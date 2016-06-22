@@ -139,7 +139,7 @@ class Order(db.Model):
     __tablename__ = 'order'
     id = db.Column(db.Integer, primary_key=True)
     vendorparts = db.relationship('Order_VendorPart', back_populates='order')
-    order_placed = db.Column(db.Boolean)
+    archived = db.Column(db.Boolean)
     description = db.Column(db.String)
     delivery_date = db.Column(db.Date)
     cost_object = db.Column(db.String)

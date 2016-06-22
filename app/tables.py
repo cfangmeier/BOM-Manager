@@ -1,7 +1,7 @@
 import re
 from itertools import groupby
 from flask import flash
-from flask_table import Table, Col, LinkCol, DatetimeCol
+from flask_table import Table, Col, LinkCol, DatetimeCol, BoolCol
 from flask.ext.wtf import Form
 from wtforms import BooleanField, SubmitField, IntegerField, StringField
 from wtforms.validators import NumberRange, DataRequired
@@ -38,14 +38,16 @@ class OrderTable(Table):
                  url_kwargs=dict(id='id'), attr_list=['id'])
     order_name = Col('Name')
     timestamp = DatetimeCol('Created On')
+    archived = BoolCol('Archived')
 
-    def __init__(self, orders, **kwargs):
-        items = []
-        for order in orders:
-            items.append({'id': order.id,
-                          'order_name': order.order_name,
-                          'timestamp': order.timestamp})
-        super().__init__(items, **kwargs)
+    # def __init__(self, orders, **kwargs):
+    #     items = []
+    #     for order in orders:
+    #         items.append({'id': order.id,
+    #                       'order_name': order.order_name,
+    #                       'timestamp': order.timestamp
+    #                       'archived': order.archived})
+    #     super().__init__(items, **kwargs)
 
 
 class VendorLoginTable(Table):
@@ -225,7 +227,8 @@ class OrderPartTable(Table):
     total_price = Col('Total Price', td_kwargs={'class': 'text-right'})
 
     class F(Form):
-        submit = SubmitField("Update Parts Count")
+        update = SubmitField("Update Parts Count")
+        archive = SubmitField("Archive Order")
         export = SubmitField("Download Requisition Forms")
 
     def _field_name(self, item):
@@ -233,15 +236,17 @@ class OrderPartTable(Table):
 
     def _prepare_form(self):
         self.input_fields = []
-        for i, item in enumerate(self.obj_items):
+        for i, item in enumerate(self.order.vendorparts):
             field_name = self._field_name(item)
             field = IntegerField(field_name,
                                  widget=NumberInput(min=0),
                                  validators=[NumberRange(min=0)],
                                  default=item.number_ordered,
+                                 render_kw={'readonly': self.order.archived},
                                  )
             setattr(self.F, field_name, field)
             self.input_fields.append((field_name, item.id))
+        self.f = self.F()
 
     def get_counts(self):
         counts = {}
@@ -251,10 +256,12 @@ class OrderPartTable(Table):
         return counts
 
     def render(self):
-        self.obj_items.sort(key=lambda x: x.vendorpart.vendor_part_number)
-        self.obj_items.sort(key=lambda x: x.vendorpart.vendor)
+        self._prepare_form()
+        obj_items = self.order.vendorparts
+        obj_items.sort(key=lambda x: x.vendorpart.vendor_part_number)
+        obj_items.sort(key=lambda x: x.vendorpart.vendor)
         item_dicts = []
-        for item in self.obj_items:
+        for item in obj_items:
             vendor = item.vendorpart.vendor
             vendor_part_number = item.vendorpart.vendor_part_number
             manufacturer = item.vendorpart.part.manufacturer
@@ -283,7 +290,6 @@ class OrderPartTable(Table):
             item_dicts.append(item_dict)
         super().__init__(item_dicts)
 
-    def __init__(self, items):
-        self.obj_items = items
+    def __init__(self, order):
+        self.order = order
         self._prepare_form()
-        self.f = self.F()

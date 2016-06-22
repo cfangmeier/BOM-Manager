@@ -10,7 +10,7 @@
     <b>Uploaded On:</b> {{bom.timestamp }}
   </pre>
   <form action="" method="post" name="lookup_parts" enctype="multipart/form-data">
-    <input type="submit" value="Lookup Parts">
+    <input type="submit" value="Lookup/Refresh Parts">
   </form>
   <hr>
   <a href= {{ url_for('bom_summary', id=bom.id, display='full') }}> Full Display </a>

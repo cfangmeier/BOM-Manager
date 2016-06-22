@@ -26,12 +26,12 @@
     <div class="container-fluid">
       <div class="row">
         <div class="col-sm-2">
-          <ul>
-            <li><a href="{{ url_for('index') }}">Home</a></li>
-            <li><a href="{{ url_for('upload') }}">Upload New BOM</a></li>
-            <li><a href="{{ url_for('new_order') }}">New Order</a></li>
-            <li><a href="{{ url_for('login') }}">Log in</a></li>
-            <li><a href="{{ url_for('search_part') }}">Search Parts</a></li>
+          <ul class="list-group">
+            <a class="list-group-item list-group-item-success" href="{{ url_for('index') }}">Home</a>
+            <a class="list-group-item" href="{{ url_for('upload') }}">Upload New BOM</a>
+            <a class="list-group-item" href="{{ url_for('new_order') }}">New Order</a>
+            <a class="list-group-item" href="{{ url_for('login') }}">Log into Vendor APIs</a>
+            <a class="list-group-item" href="{{ url_for('search_part') }}">Search Parts</a>
           </ul>
         </div>
         <div class="col-sm-10">

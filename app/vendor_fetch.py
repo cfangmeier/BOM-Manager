@@ -3,8 +3,11 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.parse import quote_plus
 from flask import session, redirect, flash, url_for
+from sqlalchemy import desc
 from app import app, oauth, db
-from .models import VendorPart, Part
+from .models import VendorPart, Part, Order_VendorPart, Order
+
+ONE_DAY = timedelta(minutes=1)
 
 
 class Digikey():
@@ -161,15 +164,36 @@ def oauth_callback():
     return vendor.callback()
 
 
+def populate_part(bompart):
+    # First, search for matching vendorpart
+    query = VendorPart.query
+    vendorpart = db.session.query(VendorPart).\
+        filter(VendorPart.vendor == bompart.lookup_source,
+               VendorPart.vendor_part_number == bompart.lookup_id).\
+        order_by(desc(VendorPart.fetch_timestamp)).first()
+    if vendorpart and (datetime.now() - vendorpart.fetch_timestamp) < ONE_DAY:
+        # found a matching vendorpart *and* it is not outdated
+        bompart.part = vendorpart.part
+        db.session.add(bompart)
+    elif bompart.lookup_source is not None:
+        # no matching and up-to-date vendorpart found.
+        # Search for a new one, and if needed update any
+        # non-archived Order_VendorParts in db
+        vendorpart = vendors[bompart.lookup_source].query(bompart)
+        vendor = vendorpart.vendor
+        vpn = vendorpart.vendor_part_number
+        query = db.session.query(Order_VendorPart).\
+            join(VendorPart, Order_VendorPart.vendorpart_id == VendorPart.id).\
+            join(Order, Order_VendorPart.order_id == Order.id).\
+            filter(VendorPart.vendor == vendor).\
+            filter(VendorPart.vendor_part_number == vpn).\
+            filter(Order.archived == False)
+        for order_vendorpart in query.all():
+            order_vendorpart.vendorpart = vendorpart
+            db.session.add(order_vendorpart)
+    db.session.commit()
+
+
 def populate_parts(bom):
     for bompart in bom.bomparts:
-        query = VendorPart.query
-        query = query.filter(VendorPart.vendor == bompart.lookup_source,
-                             VendorPart.vendor_part_number == bompart.lookup_id)
-        vendorpart = query.first()
-        if vendorpart is not None:
-            bompart.part = vendorpart.part
-            db.session.add(bompart)
-            db.session.commit()
-        elif bompart.lookup_source is not None:
-            vendors[bompart.lookup_source].query(bompart)
+        populate_part(bompart)

@@ -54,10 +54,10 @@ def order_summary():
     order = query.first()
     if order is None:
         raise NotFound()
-    parts_table = OrderPartTable(order.vendorparts)
+    parts_table = OrderPartTable(order)
     form = parts_table.f
     if form.validate_on_submit():
-        if form.submit.data:
+        if form.update.data:
             counts = parts_table.get_counts()
             for part in order.vendorparts:
                 part.number_ordered = counts[part.id]
@@ -68,6 +68,9 @@ def order_summary():
             disposition = "attachment; filename=myfile.zip"
             response.headers['Content-Disposition'] = disposition
             return response
+        elif form.archive.data:
+            order.archived = True
+            db.session.commit()
     parts_table.render()
 
     return render_template('order_summary.html',
@@ -89,7 +92,8 @@ def upload():
         bom.author = form.author.data
         db.session.add(bom)
         db.session.commit()
-        flash("File {} successfully processed.".format(filename), category='success')
+        flash("File {} successfully processed.".format(filename),
+              category='success')
         return redirect(url_for('bom_summary', id=bom.id))
     return render_template('upload.html', form=form)
 
@@ -104,7 +108,8 @@ def new_order():
                     for id_, s_name, c_name in table.inputs
                     if getattr(form, s_name).data is True]
         if not bom_data:
-            flash('Must select at least 1 BOM to include in order', category='warning')
+            flash('Must select at least 1 BOM to include in order',
+                  category='warning')
             return render_template('new_order.html',
                                    bom_table=table,
                                    form=form)
@@ -137,7 +142,7 @@ def new_order():
                     vendorparts_count[key] += count_lookup[bom.id]
                 except (AttributeError, IndexError) as e:
                     print(e)
-        order.order_placed = False
+        order.archived = False
         order.timestamp = dt.now()
         db.session.add(order)
         for key, count in vendorparts_count.items():
