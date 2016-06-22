@@ -24,3 +24,6 @@ To Do
 -----
 -  Add support for additional vendors. This mostly just entails writing additional screen-scrapers/api accessors for vendor websites.
 -  Add support for more output formats. CSV/Excell is at the top of the list. Automatically populating a cart on Digikey would also be cool.
+-  Add the availity to set Orders to "Archived" where the prices and numbers become fixed. This is meant to then act as a record of a previous order.
+-  Add ability to refresh Digikey Oauth tokens so the user doesn't need to re-authenticate when the token expires(every few days)
+-  
