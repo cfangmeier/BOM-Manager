@@ -20,7 +20,6 @@ openpyxl==2.3.5
 pbr==1.10.0
 pexpect==4.1.0
 pickleshare==0.7.2
-pipdeptree==0.6.0
 ptyprocess==0.5.1
 pytz==2016.4
 requests==2.10.0

@@ -1,7 +1,7 @@
 import re
 from itertools import groupby
 from flask import flash
-from flask_table import Table, Col, LinkCol
+from flask_table import Table, Col, LinkCol, DatetimeCol
 from flask.ext.wtf import Form
 from wtforms import BooleanField, SubmitField, IntegerField, StringField
 from wtforms.validators import NumberRange, DataRequired
@@ -17,7 +17,7 @@ class BOMTable(Table):
     version = Col('Version')
     author = Col('Author')
     part_count = Col('Part Count')
-    timestamp = Col('Uploaded on')
+    timestamp = DatetimeCol('Uploaded on')
 
     def __init__(self, boms, **kwargs):
         items = []
@@ -37,7 +37,7 @@ class OrderTable(Table):
     id = LinkCol('ID', 'order_summary',
                  url_kwargs=dict(id='id'), attr_list=['id'])
     order_name = Col('Name')
-    timestamp = Col('Created On')
+    timestamp = DatetimeCol('Created On')
 
     def __init__(self, orders, **kwargs):
         items = []

@@ -2,11 +2,18 @@
 {% block content %}
   <div class='row'>
     <div class='col-sm-6'>
-      <h1>Existing Bills of Materials</h1>
-      {{ bom_table }}
+      <h1>Existing BOM's</h1>
     </div>
     <div class='col-sm-6'>
       <h1>Existing Orders</h1>
+    </div>
+  </div>
+  <hr>
+  <div class='row'>
+    <div class='col-sm-6'>
+      {{ bom_table }}
+    </div>
+    <div class='col-sm-6'>
       {{ order_table }}
     </div>
   </div>
