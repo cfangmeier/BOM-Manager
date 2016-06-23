@@ -180,6 +180,9 @@ def populate_part(bompart):
         # Search for a new one, and if needed update any
         # non-archived Order_VendorParts in db
         vendorpart = vendors[bompart.lookup_source].query(bompart)
+        if vendorpart is None:
+            flash("Error Looking up Part {} from {}.".format(bompart.lookup_id, bompart.lookup_source))
+            return
         vendor = vendorpart.vendor
         vpn = vendorpart.vendor_part_number
         query = db.session.query(Order_VendorPart).\

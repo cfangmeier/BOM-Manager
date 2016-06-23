@@ -61,6 +61,9 @@
     </div>
   </body>
   <script>
+  $('.order_count').on('change', function(event) {
+    this.style.background += 'rgb(255, 204, 153)';
+  });
   $(document).ready(function () {
     $('.price_break').each(function(index){
       var outstr = '<table class="table table-condensed">';

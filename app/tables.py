@@ -1,5 +1,6 @@
 import re
 from itertools import groupby
+
 from flask import flash
 from flask_table import Table, Col, LinkCol, DatetimeCol, BoolCol
 from flask.ext.wtf import Form
@@ -39,15 +40,6 @@ class OrderTable(Table):
     order_name = Col('Name')
     timestamp = DatetimeCol('Created On')
     archived = BoolCol('Archived')
-
-    # def __init__(self, orders, **kwargs):
-    #     items = []
-    #     for order in orders:
-    #         items.append({'id': order.id,
-    #                       'order_name': order.order_name,
-    #                       'timestamp': order.timestamp
-    #                       'archived': order.archived})
-    #     super().__init__(items, **kwargs)
 
 
 class VendorLoginTable(Table):
@@ -211,19 +203,32 @@ class BOMPartTableFull(Table):
         super().__init__(item_dicts, **kwargs)
 
 
+class ExtLinkCol(LinkCol):
+    def text(self, item, attr_list):
+        if attr_list:
+            return self.from_attr_list(item, attr_list)
+        else:
+            return self.name
+
+    def url(self, item):
+        return item['url']
+
+
 class OrderPartTable(Table):
     classes = ['table', 'table-hover',
                'table-condensed', 'table-striped']
     vendor = Col('Vendor')
-    vendor_part_number = Col('Vendor Part #')
+    vendor_part_number = ExtLinkCol('Vendor Part #', '', attr_list=['vendor_part_number'])
     manufacturer = Col('Manufacturer')
     manufacturer_part_number = Col('Manufacturer Part #')
-    used_count = Col('Used Count', td_kwargs={'class': 'text-right'})
+    used_count = Col('Used Count',
+                     td_kwargs={'class': 'text-right used_count'})
     order_count = Col('Order Count')
-    unit_price = Col('Unit Price', td_kwargs={'class': 'text-right price_break',
-                                              'data-toggle': 'tooltip',
-                                              'data-placement': 'auto',
-                                              'data-price-breaks': lambda x: x['part'].vendorpart.format_price_breaks()})
+    unit_price = Col('Unit Price',
+                     td_kwargs={'class': 'text-right price_break',
+                                'data-toggle': 'tooltip',
+                                'data-placement': 'auto',
+                                'data-price-breaks': lambda x: x['part'].vendorpart.format_price_breaks()})
     total_price = Col('Total Price', td_kwargs={'class': 'text-right'})
 
     class F(Form):
@@ -242,7 +247,9 @@ class OrderPartTable(Table):
                                  widget=NumberInput(min=0),
                                  validators=[NumberRange(min=0)],
                                  default=item.number_ordered,
-                                 render_kw={'readonly': self.order.archived},
+                                 render_kw={'readonly': self.order.archived,
+                                            'disabled': self.order.archived,
+                                            'class': 'text-right order_count'}
                                  )
             setattr(self.F, field_name, field)
             self.input_fields.append((field_name, item.id))
@@ -286,7 +293,8 @@ class OrderPartTable(Table):
                          'order_count': order_count,
                          'unit_price': unit_price,
                          'total_price': total_price,
-                         'part': item}
+                         'part': item,
+                         'url': item.vendorpart.url}
             item_dicts.append(item_dict)
         super().__init__(item_dicts)
 

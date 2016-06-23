@@ -65,7 +65,11 @@ def order_summary():
         elif form.export.data:
             zf_data = build_requisition(order)
             response = make_response(zf_data)
-            disposition = "attachment; filename=myfile.zip"
+            sane_fname = [c for c in order.order_name
+                          if c.isalpha() or c.isdigit() or c == ' ']
+            sane_fname = "".join(sane_fname).rstrip()
+            sane_fname = sane_fname.replace(' ', '_')
+            disposition = "attachment; filename={}.zip".format(sane_fname)
             response.headers['Content-Disposition'] = disposition
             return response
         elif form.archive.data:
