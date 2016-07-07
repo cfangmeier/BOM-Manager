@@ -40,10 +40,19 @@
     <div class="btn-group">
       {% if order.archived %}
       <button type="button" class="btn btn-success disabled">Order is archived!</button>
-      {{ form.export(class="btn btn-primary") }}
-      {% else %}
+      {% endif %}
+      <div class="btn-group dropdown">
+        <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
+          Export Order
+          <span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li>{{ form.export_unl_requisition(class="btn btn-block")}}</li>
+          <li>{{ form.export_digikey(class="btn btn-block")}}</li>
+          <li>{{ form.export_mouser(class="btn disabled btn-block")}}</li>
+        </ul>
+      </div>
+      {% if not order.archived %}
       {{ form.update(class="btn btn-primary") }}
-      {{ form.export(class="btn btn-primary") }}
       {{ form.archive(class="btn btn-warning") }}
       {% endif %}
     </div>

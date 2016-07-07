@@ -10,7 +10,7 @@ from .tables import (BOMTable, BOMPartTableShort, BOMPartTableFull,
                      BOMSelectorTable, OrderTable, VendorLoginTable,
                      OrderPartTable)
 from .vendor_fetch import vendors, populate_parts
-from .generate_requisition import build_requisition
+from .generate_requisition import UNLRequisition, DigikeyCart
 
 
 @app.route("/")
@@ -62,16 +62,23 @@ def order_summary():
             for part in order.vendorparts:
                 part.number_ordered = counts[part.id]
             db.session.commit()
-        elif form.export.data:
-            zf_data = build_requisition(order)
-            response = make_response(zf_data)
-            sane_fname = [c for c in order.order_name
-                          if c.isalpha() or c.isdigit() or c == ' ']
-            sane_fname = "".join(sane_fname).rstrip()
-            sane_fname = sane_fname.replace(' ', '_')
-            disposition = "attachment; filename={}.zip".format(sane_fname)
+        elif form.export_unl_requisition.data:
+            req = UNLRequisition(order)
+            filename, req_data = req.get_form()
+            response = make_response(req_data)
+            disposition = "attachment; filename={}".format(filename)
             response.headers['Content-Disposition'] = disposition
             return response
+        elif form.export_digikey.data:
+            cart = DigikeyCart(order)
+            filename, cart_data = cart.get_form()
+            response = make_response(cart_data)
+            disposition = "attachment; filename={}".format(filename)
+            response.headers['Content-Disposition'] = disposition
+            return response
+        elif form.export_mouser.data:
+            flash("Mouser not implemented", category="warning")
+            return redirect(url_for('index'))
         elif form.archive.data:
             order.archived = True
             db.session.commit()

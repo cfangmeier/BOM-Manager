@@ -3,3 +3,4 @@ flask/
 uploads/
 app.db
 __pycache__
+.ropeproject

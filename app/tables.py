@@ -218,7 +218,8 @@ class OrderPartTable(Table):
     classes = ['table', 'table-hover',
                'table-condensed', 'table-striped']
     vendor = Col('Vendor')
-    vendor_part_number = ExtLinkCol('Vendor Part #', '', attr_list=['vendor_part_number'])
+    vendor_part_number = ExtLinkCol('Vendor Part #', '',
+                                    attr_list=['vendor_part_number'])
     manufacturer = Col('Manufacturer')
     manufacturer_part_number = Col('Manufacturer Part #')
     used_count = Col('Used Count',
@@ -234,7 +235,9 @@ class OrderPartTable(Table):
     class F(Form):
         update = SubmitField("Update Parts Count")
         archive = SubmitField("Archive Order")
-        export = SubmitField("Download Requisition Forms")
+        export_unl_requisition = SubmitField("UNL Requisition Forms")
+        export_digikey = SubmitField("Digikey")
+        export_mouser = SubmitField("Mouser")
 
     def _field_name(self, item):
         return "order_number_{}".format(item.id)
