@@ -1,11 +1,70 @@
-from os import path
+import re
+import zipfile
 from datetime import datetime
 from collections import namedtuple
 
+from passlib.hash import sha256_crypt
+
 from app import db
 
+# Define the PriceBreak type. Too simple to make own model. Just pickle it and
+# store as a binary blob in db.
 PriceBreak = namedtuple('PriceBreak', ('number', 'price_dollars'))
+
+# vendors defines the map between field keys in the KiCAD schematic and actual
+# Vendor names.
 vendors = {'digipart': 'Digikey'}
+
+
+class User(db.Model):
+    __tablename__ = 'user'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String)
+    email = db.Column(db.String, unique=True)
+    pwd_hash = db.Column(db.String)
+    boms = db.relationship('BillOfMaterials', back_populates='user')
+    orders = db.relationship('Order', back_populates='user')
+
+    def __init__(self, name, email, password):
+        self.name = name
+        self.email = email
+        self.pwd_hash = sha256_crypt.encrypt(password)
+
+    @staticmethod
+    def authenticate(email: str, password: str):
+        """ Find and authenticate a user
+
+        Finds a user with a known email and ensure that the password hash
+        matches the one on file
+
+        Returns:
+            The matching uses if email/password matches one on file, otherwise
+            None.
+
+        """
+        user = User.query.filter(User.email == email).first()
+        if not user:
+            return None
+        pwd_ok = sha256_crypt.verify(password, user.pwd_hash)
+        if not pwd_ok:
+            return None
+        else:
+            return user
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_anonymouse(self):
+        return False
+
+    def get_id(self):
+        return str(self.id)
 
 
 class Part(db.Model):
@@ -30,60 +89,77 @@ class BOMPart(db.Model):
     part_id = db.Column(db.Integer, db.ForeignKey('part.id'))
     part = db.relationship('Part', back_populates='bomparts')
 
+    @staticmethod
+    def from_kicad_schematic_string(sch_string):
+        """ Build a part from a KiCAD Schematic Component string
+        For example:
+        ================================================
+        L QTH-090-01-F-D-A P1
+        U 1 1 55CCAA2D
+        P 2700 5850
+        F 0 "P1" H 2700 5750 50  0000 C CNN
+        F 1 "QTH-090-01-F-D-A" H 2700 5950 50  0000 C CNN
+        F 2 "extras:QTH-090-XX-X-D-A" H 2700 5850 50  0001 C CNN
+        F 3 "DOCUMENTATION" H 2700 5850 50  0001 C CNN
+        F 4 "SAM8195-ND" H 2700 5850 60  0001 C CNN "digipart"
+                1    2700 5850
+                1    0    0    -1
+        ================================================
+        """
+        part = BOMPart()
+        for line in sch_string.split('\n'):
+            fields = line.split()
+            if fields[0] == 'L':
+                part.reference = fields[2]
+            if fields[0] == 'F':
+                try:
+                    # field 10 is name(if present), also remove quotes
+                    field_name = fields[10][1:-1]
+                    field_value = fields[2][1:-1]
+                    part.lookup_source = vendors[field_name]
+                    part.lookup_id = field_value
+                except IndexError:  # No valid field name/value
+                    continue
+                except KeyError:  # unrecognized vendor identifier
+                    continue
+        return part
+
 
 class BillOfMaterials(db.Model):
     __tablename__ = 'billofmaterials'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
-    xml_file = db.Column(db.String)
+    zip_file = db.Column(db.String)
     version = db.Column(db.String)
-    author = db.Column(db.String)
     timestamp = db.Column(db.DateTime)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship('User', back_populates='boms')
     bomparts = db.relationship('BOMPart', back_populates='bom')
     orders = db.relationship('Order_BOM', back_populates='bom')
 
     @staticmethod
-    def from_file(xml_file):
-        from xml.etree import ElementTree
+    def from_kicad_archive(zip_filename):
+        zf = zipfile.ZipFile(zip_filename)
 
-        def find_lookup_info(comp):
-            try:
-                for field in comp.find('fields').findall('field'):
-                    try:
-                        lookup_source = vendors[field.attrib['name']]
-                        lookup_id = field.text
-                        return lookup_source.strip(), lookup_id.strip()
-                    except KeyError:
-                        continue
-            except AttributeError:
-                pass
-            return None, None
-
-        def find_comp_info(comp):
-            reference = comp.attrib['ref']
-            value = comp.find('value').text
-            return reference, value
-
+        def get_parts_from_schematic(sch_file):
+            txt = zf.read(sch_file).decode('utf-8')
+            parts = []
+            regex = r'\$Comp\s*(.*?)\s*\$EndComp'
+            for part_str in re.findall(regex, txt, flags=re.DOTALL):
+                part = BOMPart.from_kicad_schematic_string(part_str)
+                if part.reference[0] != '#':
+                    parts.append(part)
+            return parts
         bom = BillOfMaterials()
-        bom.xml_file = xml_file
+        bom.zip_file = zip_filename
         bom.timestamp = datetime.now()
-
-        etree = ElementTree.parse(xml_file)
-        for comp in etree.iter('comp'):
-            part = BOMPart()
-            lookup_source, lookup_id = find_lookup_info(comp)
-            part.lookup_source = lookup_source
-            part.lookup_id = lookup_id
-            reference, value = find_comp_info(comp)
-            part.reference = reference
-            part.value = value
-            bom.bomparts.append(part)
-        source = etree.find('design').find('source').text
-        bom.name = path.splitext(path.split(source)[1])[0]
+        for file_ in zf.filelist:
+            if file_.filename.endswith('.sch'):
+                sch_parts = get_parts_from_schematic(file_)
+                bom.bomparts.extend(sch_parts)
         return bom
 
     def lookup_parts(self):
-
         for bompart in self.bomparts:
             vendor = vendors[bompart.lookup_source]
             vendor_part_number = bompart.lookup_id
@@ -94,9 +170,6 @@ class BillOfMaterials(db.Model):
             vendor_part = query.first()
             if vendor_part:
                 bompart.part = vendor_part.part
-            else:
-                pass
-
         db.commit()
 
 
@@ -148,6 +221,8 @@ class Order(db.Model):
     supervisor_name = db.Column(db.String)
     order_name = db.Column(db.String)
     timestamp = db.Column(db.DateTime)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship('User', back_populates='orders')
     boms = db.relationship('Order_BOM', back_populates='order')
 
 

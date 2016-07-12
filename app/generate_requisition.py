@@ -1,4 +1,4 @@
-from io import BytesIO
+import io
 import urllib
 import zipfile
 import datetime
@@ -7,22 +7,7 @@ import openpyxl
 from openpyxl.writer.excel import save_virtual_workbook
 
 from .vendor_fetch import vendors
-
-
-def chunks(l, n):
-    """Yield successive n-sized chunks from l"""
-    cs = []
-    for i in range(0, len(l), n):
-        cs.append(l[i:i+n])
-    return cs
-
-
-def sanitize_filename(filename, ext):
-    sane_fname = [c for c in filename
-                  if c.isalpha() or c.isdigit() or c == ' ']
-    sane_fname = "".join(sane_fname).rstrip()
-    sane_fname =  sane_fname.replace(' ', '_')
-    return "{}.{}".format(sane_fname, ext)
+from .utils import chunks, sanitize_filename
 
 
 class UNLRequisition:
@@ -39,7 +24,8 @@ class UNLRequisition:
         blank_req_url = "http://www.unl.edu/physics/docs/Requisition2014.xlsx"
         if self._blank_form_raw is None:
             self._blank_form_raw = urllib.request.urlopen(blank_req_url).read()
-        self.workbook = openpyxl.load_workbook(BytesIO(self._blank_form_raw))
+        bio = io.BytesIO(self._blank_form_raw)
+        self.workbook = openpyxl.load_workbook(bio)
 
     def populate_misc_fields(self, vendor):
         ws = self.workbook.active
@@ -81,7 +67,7 @@ class UNLRequisition:
         in memory and then returns it as bytes.
         """
         parts_chunked = chunks(self.order.vendorparts, 10)
-        bio = BytesIO()
+        bio = io.BytesIO()
         zf = zipfile.ZipFile(bio, 'x')
         for i, parts_chunk in enumerate(parts_chunked):
             self.fetch_empty_form()

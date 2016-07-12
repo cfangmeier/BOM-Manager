@@ -2,24 +2,24 @@
 {% block content %}
   <form action="" method="post" name="upload" enctype="multipart/form-data">
     <div class="col-xs-12" style="height:30px;"></div>
-    <h2> Upload a new KiCAD XML Style Bill of Materials </h2>
+    <h2> Upload a new KiCAD project archive.</h2>
     <div class="col-xs-12" style="height:30px;"></div>
     <div class='row'>
       <div class='col-sm-4'>
          <table class='table'>
            <tr>
-             <td> {{ form.version.label }} </td>
-             <td>{{ form.version }}</td>
+             <td> {{ form.name.label }} </td>
+             <td>{{ form.name }}</td>
            </tr>
            <tr>
-             <td>{{ form.author.label }}</td>
-             <td>{{ form.author }}</td>
+             <td> {{ form.version.label }} </td>
+             <td>{{ form.version }}</td>
            </tr>
          </table>
       </div>
       <div class='col-sm-8'>
         {{ form.hidden_tag() }}
-        {{ form.file }}<br>
+        {{ form.file_(accept=".zip") }}<br>
         <input type="submit" value="Upload File">
       </div>
     </div>

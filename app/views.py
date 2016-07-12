@@ -1,16 +1,22 @@
 from collections import defaultdict
 from datetime import datetime as dt
-from flask import (request, redirect, url_for,
+
+from flask import (request, redirect, url_for, g,
                    render_template, flash, make_response)
 from flask.helpers import NotFound
-from app import app, db, uploads
-from .models import BillOfMaterials, Order, Order_VendorPart, Order_BOM, Part
-from .forms import UploadForm, PartSearchForm
+from flask_login import login_user, logout_user, current_user, login_required
+
+from app import app, db, uploads, login_manager
+from .models import (BillOfMaterials, Order, Order_VendorPart, Order_BOM, Part,
+                     User)
+from .forms import (UploadForm, PartSearchForm, LoginForm, RegisterUserForm,
+                    BOMActionForm)
 from .tables import (BOMTable, BOMPartTableShort, BOMPartTableFull,
                      BOMSelectorTable, OrderTable, VendorLoginTable,
                      OrderPartTable)
 from .vendor_fetch import vendors, populate_parts
 from .generate_requisition import UNLRequisition, DigikeyCart
+from .utils import sanitize_filename
 
 
 @app.route("/")
@@ -25,21 +31,71 @@ def index():
                            order_table=order_table)
 
 
+@app.route('/register_user', methods=['GET', 'POST'])
+def register_user():
+    form = RegisterUserForm()
+    if form.validate_on_submit():
+        user = User(form.name.data, form.email.data, form.password.data)
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+
+        flash('Logged in successfully.')
+        return redirect(url_for('index'))
+    return render_template('register_user.html', form=form)
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    # Here we use a class of some kind to represent and validate our
+    # client-side form data. For example, WTForms is a library that will
+    # handle this for us, and we use a custom LoginForm to validate.
+    form = LoginForm()
+    if form.validate_on_submit():
+        # Login and validate the user.
+        # user should be an instance of your `User` class
+        user = User.authenticate(form.email.data, form.password.data)
+        if user is None:
+            flash("Failed to log in", category='warning')
+        if user is not None:
+            login_user(user)
+            flash('Logged in successfully.', category='success')
+            return redirect(url_for('index'))
+
+    return render_template('login.html', form=form)
+
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('index'))
+
+
 @app.route("/bom_summary", methods=['GET', 'POST'])
+@login_required
 def bom_summary():
     bomid = request.args.get('id')
     display = request.args.get('display', 'full')
     query = BillOfMaterials.query
     query = query.filter(BillOfMaterials.id == bomid)
     bom = query.first()
+    form = BOMActionForm()
     if bom is not None:
-        if request.method == 'POST':
+        if form.update.data:
             populate_parts(bom)
+        elif form.download.data:
+            with open(bom.zip_file, 'rb') as f:
+                response = make_response(f.read())
+            fname = sanitize_filename(bom.name, ext="zip")
+            disposition = "attachment; filename={}".format(fname)
+            response.headers['Content-Disposition'] = disposition
+            return response
         if display == 'condensed':
             parts_table = BOMPartTableShort(bom.bomparts)
         else:
             parts_table = BOMPartTableFull(bom.bomparts)
         return render_template('bom_summary.html',
+                               form=form,
                                bom=bom,
                                parts_table=parts_table)
     else:
@@ -47,6 +103,7 @@ def bom_summary():
 
 
 @app.route('/order_summary', methods=['GET', 'POST'])
+@login_required
 def order_summary():
     orderid = request.args.get('id')
     query = Order.query
@@ -91,16 +148,18 @@ def order_summary():
 
 
 @app.route('/upload', methods=['GET', 'POST'])
+@login_required
 def upload():
     """ User may upload a new BOM File
     """
     form = UploadForm()
     if form.validate_on_submit():
-        file = request.files['file']
-        filename = uploads.save(file)
-        bom = BillOfMaterials.from_file(uploads.path(filename))
+        file_ = request.files['file_']
+        filename = uploads.save(file_)
+        bom = BillOfMaterials.from_kicad_archive(uploads.path(filename))
+        bom.name = form.name.data
         bom.version = form.version.data
-        bom.author = form.author.data
+        bom.user = g.user
         db.session.add(bom)
         db.session.commit()
         flash("File {} successfully processed.".format(filename),
@@ -110,6 +169,7 @@ def upload():
 
 
 @app.route("/new_order", methods=['GET', 'POST'])
+@login_required
 def new_order():
     boms = BillOfMaterials.query.all()
     table = BOMSelectorTable(boms)
@@ -137,6 +197,7 @@ def new_order():
         order.requestor_name = form.requestor_name.data
         order.requestor_phone = form.requestor_phone.data
         order.supervisor_name = form.supervisor_name.data
+        order.user = g.user
         for bom in query.all():
             order_bom = Order_BOM()
             order_bom.order = order
@@ -195,14 +256,15 @@ def search_part():
     return render_template('search_part.html', form=form, parts=parts)
 
 
-@app.route("/login", methods=['GET', 'POST'])
-def login():
+@app.route("/vendor_login", methods=['GET', 'POST'])
+@login_required
+def vendor_login():
     table = VendorLoginTable(vendors.values())
     if request.method == 'POST':
         selected = list(request.form.keys())[0]
         return vendors[selected].login()
     else:
-        return render_template('login.html', vendor_login_table=table)
+        return render_template('vendor_login.html', vendor_login_table=table)
 
 
 @app.errorhandler(404)
@@ -214,3 +276,19 @@ def not_found_error(error):
 def internal_error(error):
     db.session.rollback()
     return render_template('500.html'), 500
+
+
+@login_manager.user_loader
+def load_user(id):
+    return User.query.get(int(id))
+
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    flash("You must log in to see this resource")
+    return redirect(url_for('login'))
+
+
+@app.before_request
+def before_request():
+    g.user = current_user

@@ -7,7 +7,7 @@ from sqlalchemy import desc
 from app import app, oauth, db
 from .models import VendorPart, Part, Order_VendorPart, Order
 
-ONE_DAY = timedelta(minutes=1)
+ONE_DAY = timedelta(days=1)
 
 
 class Digikey():
@@ -52,7 +52,7 @@ class Digikey():
             session['Digikey_token'] = resp['access_token']
             session['Digikey_token_refresh'] = resp['refresh_token']
             session['Digikey_token_expires'] = now+lifetime
-        return redirect(url_for('login'))
+        return redirect(url_for('vendor_login'))
 
     @property
     def logged_on(self):

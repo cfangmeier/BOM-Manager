@@ -16,7 +16,7 @@ class BOMTable(Table):
                  url_kwargs=dict(id='id'), attr_list=['id'])
     name = Col('Name')
     version = Col('Version')
-    author = Col('Author')
+    user = Col('Uploaded By')
     part_count = Col('Part Count')
     timestamp = DatetimeCol('Uploaded on')
 
@@ -25,7 +25,7 @@ class BOMTable(Table):
         for bom in boms:
             items.append({'name': bom.name,
                           'version': bom.version,
-                          'author': bom.author,
+                          'user': bom.user.name,
                           'id': bom.id,
                           'part_count': len(bom.bomparts),
                           'timestamp': bom.timestamp})
@@ -37,9 +37,20 @@ class OrderTable(Table):
                'table-condensed', 'table-striped']
     id = LinkCol('ID', 'order_summary',
                  url_kwargs=dict(id='id'), attr_list=['id'])
+    user = Col('Created By')
     order_name = Col('Name')
     timestamp = DatetimeCol('Created On')
     archived = BoolCol('Archived')
+
+    def __init__(self, orders, **kwargs):
+        items = []
+        for order in orders:
+            items.append({'id': order.id,
+                          'user': order.user.name,
+                          'order_name': order.order_name,
+                          'timestamp': order.timestamp,
+                          'archived': order.archived})
+        super().__init__(items, **kwargs)
 
 
 class VendorLoginTable(Table):
@@ -81,7 +92,7 @@ class BOMSelectorTable(Table):
     id = Col('ID')
     name = Col('Name')
     version = Col('Version')
-    author = Col('Author')
+    user = Col('Uploaded By')
     selector = Col('Select')
     count = Col('Count')
 
@@ -120,18 +131,19 @@ class BOMSelectorTable(Table):
                                  default=1)
             setattr(self.F, field_names['count'], count)
 
-    def __init__(self, items, **kwargs):
-        self._prepare_form(items)
+    def __init__(self, boms, **kwargs):
+        self._prepare_form(boms)
         self.f = self.F()
-        for i, item in enumerate(items):
-            field_names = self._field_names(item)
-            items[i] = {'id': item.id,
-                        'name': item.name,
-                        'version': item.version,
-                        'author': item.author,
-                        'selector': getattr(self.f, field_names['selector']),
-                        'count': getattr(self.f, field_names['count']),
-                        }
+        items = []
+        for bom in boms:
+            field_names = self._field_names(bom)
+            item = {'id': bom.id,
+                    'name': bom.name,
+                    'version': bom.version,
+                    'user': bom.user.name,
+                    'selector': getattr(self.f, field_names['selector']),
+                    'count': getattr(self.f, field_names['count'])}
+            items.append(item)
         super().__init__(items, **kwargs)
 
 
