@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.parse import quote_plus
-from flask import session, redirect, flash, url_for
+from flask import redirect, flash, url_for, g
 from sqlalchemy import desc
 from app import app, oauth, db
 from .models import VendorPart, Part, Order_VendorPart, Order
@@ -23,7 +23,7 @@ class Digikey():
         self.oauth = oauth.remote_app('Digikey',
                                       app_key='DIGIKEY',
                                       request_token_url=None,)
-        self.oauth.tokengetter(self.tokengetter)
+        self.oauth.tokengetter(Digikey.tokengetter)
         self.name = 'Digikey'
 
     def login(self):
@@ -32,8 +32,8 @@ class Digikey():
         Redirect the user/resource owner to the OAuth provider (i.e. Digikey)
         using an URL with a few key OAuth parameters.
         """
-        session['login_vendor'] = 'Digikey'
         return self.oauth.authorize(callback=url_for('oauth_callback',
+                                                     vendor_name='Digikey',
                                                      _external=True))
 
     def callback(self):
@@ -42,32 +42,36 @@ class Digikey():
         Gets the authorization response from the redirect url. and uses
         it to get the session token.
         """
+        user = g.user
         resp = self.oauth.authorized_response()
         if resp is None:
             flash('Request for authorization denied. :(', category='warning')
         else:
-            flash('You logged in successfully.', category='success')
+            flash('You logged in successfully. :)', category='success')
             now = datetime.now()
             lifetime = timedelta(seconds=int(resp['expires_in']))
-            session['Digikey_token'] = resp['access_token']
-            session['Digikey_token_refresh'] = resp['refresh_token']
-            session['Digikey_token_expires'] = now+lifetime
+            user.digikey_oauth_token = resp['access_token']
+            user.digikey_oauth_token_expire = now+lifetime
+            user.digikey_oauth_refresh_token = resp['refresh_token']
+            db.session.commit()
         return redirect(url_for('vendor_login'))
 
     @property
     def logged_on(self):
         """ Checks if logged on
 
-        Returns True is the session contains a non-expired token,
-        false otherwise.
+        Returns True if the user has authorized the app
         """
-        expired = session.get('Digikey_token_expires')
-        if expired is None or expired < datetime.now():
+        if g.user.digikey_oauth_token is None:
             return False
-        return 'Digikey_token' in session
+        elif g.user.digikey_oauth_token_expire < datetime.now():
+            return False
+        else:
+            return True
 
-    def tokengetter(self):
-        return session['Digikey_token'], ''
+    @staticmethod
+    def tokengetter():
+        return g.user.digikey_oauth_token, ''
 
     def part_from_response(self, response):
         vendorpart = VendorPart()
@@ -89,12 +93,8 @@ class Digikey():
             part.manufacturer_part_number = mpn
             part.short_description = response['ProductDescription']
             try:
-                for media_link in response['MediaLinks']:
-                    if media_link['MediaType'] == 'Product Photos':
-                        part.image_url = media_link['Thumbnail']
-                        break
-                raise ValueError('Missing Image URL')
-            except (ValueError, KeyError):
+                part.image_url = response['PrimaryPhoto']['smallPhotoField']
+            except KeyError:
                 part.image_url = url_for('static', filename='missing_part.png')
         vendorpart.part = part
         return vendorpart
@@ -109,6 +109,7 @@ class Digikey():
         """
         if not self.logged_on:
             return None
+
         headers = {
             'accept': "*/*",
             'x-ibm-client-id': self.oauth.consumer_key,
@@ -148,11 +149,12 @@ class Digikey():
         db.session.commit()
         return vendorpart
 
+# This maps the vendor names to the vendor objects
 vendors = {'Digikey': Digikey()}
 
 
-@app.route("/oauth_callback", methods=["GET"])
-def oauth_callback():
+@app.route("/oauth_callback/<vendor_name>", methods=["GET"])
+def oauth_callback(vendor_name=""):
     """ Retrieve an access token.
 
     The user has been redirected back from the provider to your registered
@@ -160,7 +162,7 @@ def oauth_callback():
     in the redirect URL. We will use that to obtain an access token.
     """
 
-    vendor = vendors[session['login_vendor']]
+    vendor = vendors[vendor_name]
     return vendor.callback()
 
 
@@ -181,7 +183,8 @@ def populate_part(bompart):
         # non-archived Order_VendorParts in db
         vendorpart = vendors[bompart.lookup_source].query(bompart)
         if vendorpart is None:
-            flash("Error Looking up Part {} from {}.".format(bompart.lookup_id, bompart.lookup_source))
+            fmt = "Error Looking up Part {} from {}."
+            flash(fmt.format(bompart.lookup_id, bompart.lookup_source))
             return
         vendor = vendorpart.vendor
         vpn = vendorpart.vendor_part_number

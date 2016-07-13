@@ -3,6 +3,7 @@ import zipfile
 from datetime import datetime
 from collections import namedtuple
 
+from flask import flash
 from passlib.hash import sha256_crypt
 
 from app import db
@@ -11,9 +12,9 @@ from app import db
 # store as a binary blob in db.
 PriceBreak = namedtuple('PriceBreak', ('number', 'price_dollars'))
 
-# vendors defines the map between field keys in the KiCAD schematic and actual
-# Vendor names.
-vendors = {'digipart': 'Digikey'}
+# vendors defines the supported vendors. This is also they key that must be
+# added to the schematic to define a vendor part number
+vendors = {'Digikey'}
 
 
 class User(db.Model):
@@ -24,6 +25,9 @@ class User(db.Model):
     pwd_hash = db.Column(db.String)
     boms = db.relationship('BillOfMaterials', back_populates='user')
     orders = db.relationship('Order', back_populates='user')
+    digikey_oauth_token = db.Column(db.String)
+    digikey_oauth_token_expire = db.Column(db.DateTime)
+    digikey_oauth_refresh_token = db.Column(db.String)
 
     def __init__(self, name, email, password):
         self.name = name
@@ -116,11 +120,13 @@ class BOMPart(db.Model):
                     # field 10 is name(if present), also remove quotes
                     field_name = fields[10][1:-1]
                     field_value = fields[2][1:-1]
-                    part.lookup_source = vendors[field_name]
+                    if field_name not in vendors:
+                        flash('unsupported vendor: '+field_name,
+                              category='warning')
+                        continue
+                    part.lookup_source = field_name
                     part.lookup_id = field_value
                 except IndexError:  # No valid field name/value
-                    continue
-                except KeyError:  # unrecognized vendor identifier
                     continue
         return part
 

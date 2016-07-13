@@ -1,3 +1,8 @@
 #!flask/bin/python3
+import webbrowser
 from app import app, context
-app.run(debug=True, use_reloader=True, ssl_context=context)
+webbrowser.open_new_tab("https://localhost:8080/")
+app.run(port=8080,
+        debug=True,
+        use_reloader=True,
+        ssl_context=context)
